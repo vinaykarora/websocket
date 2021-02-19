@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+</head>
+
+<body ng-app="myapp">
+
+    <div ng-controller="try as ctl">
+        <input ng-model="ctl.ticket.name">
+
+        <textarea ng-model="ctl.ticket.code"></textarea>
+
+        <button ng-click="ctl.send()">Submit</button>
+    </div>
+
+
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.6/angular.min.js"></script>
+    <script>
+        var ws = new WebSocket("ws://localhost:2645/service");
+        ws.binaryType = "arraybuffer";
+        ws.onopen = function () {
+            console.log('connection is opened!!!');
+        };
+
+        ws.onmessage = function (evt) {
+            console.log(arrayBufferToString(evt.data))
+
+        };
+
+        ws.onclose = function () {
+            console.log("Connection is Closed...")
+        };
+
+        function arrayBufferToString(buffer) {
+            var arr = new Uint8Array(buffer);
+            var str = String.fromCharCode.apply(String, arr);
+
+            return decodeURIComponent(escape(str));
+        }
+        var app = angular.module('myapp', []);
+        app.controller('try', function () {
+            this.ticket = { name: '', printer: '' }
+
+            this.send = () => {
+                var toSend = JSON.stringify(this.ticket);
+                ws.send(toSend);
+            }
+        });
+    </script>
+</body>
+
+</html>
