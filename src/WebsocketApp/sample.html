@@ -7,9 +7,9 @@
 <body ng-app="myapp">
 
     <div ng-controller="try as ctl">
-        <input ng-model="ctl.ticket.name">
-
-        <textarea ng-model="ctl.ticket.code"></textarea>
+        <input ng-model="ctl.printer.printQty">
+		<input ng-model="ctl.printer.name">
+        <textarea ng-model="ctl.printer.qrtext"></textarea>
 
         <button ng-click="ctl.send()">Submit</button>
     </div>
@@ -38,12 +38,13 @@
 
             return decodeURIComponent(escape(str));
         }
+		
         var app = angular.module('myapp', []);
         app.controller('try', function () {
-            this.ticket = { name: '', printer: '' }
-
-            this.send = () => {
-                var toSend = JSON.stringify(this.ticket);
+		this.printer = { printQty: '', name: '',qrtext:'' }
+ 
+		this.send = () => {
+                var toSend = JSON.stringify(this.printer);
                 ws.send(toSend);
             }
         });

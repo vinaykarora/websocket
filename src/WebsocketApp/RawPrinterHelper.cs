@@ -2,31 +2,27 @@
 using System.IO;
 using System.Runtime.InteropServices;
 
-namespace print
+
+namespace WebsocketApp
 {
-    public class RawPrinter
+    public class RawPrinterHelper
     {
         // Structure and API declarions:
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
         public class DOCINFOA
         {
-            [MarshalAs(UnmanagedType.LPStr)]
-            public string pDocName;
-            [MarshalAs(UnmanagedType.LPStr)]
-            public string pOutputFile;
-            [MarshalAs(UnmanagedType.LPStr)]
-            public string pDataType;
+            [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+            [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
+            [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
         }
         [DllImport("winspool.Drv", EntryPoint = "OpenPrinterA", SetLastError = true, CharSet = CharSet.Ansi, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-        public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)]
-string szPrinter, ref IntPtr hPriknter, IntPtr pd);
+        public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
 
         [DllImport("winspool.Drv", EntryPoint = "ClosePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
         public static extern bool ClosePrinter(IntPtr hPrinter);
 
         [DllImport("winspool.Drv", EntryPoint = "StartDocPrinterA", SetLastError = true, CharSet = CharSet.Ansi, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-        public static extern bool StartDocPrinter(IntPtr hPrinter, int level, [In(), MarshalAs(UnmanagedType.LPStruct)]
-DOCINFOA di);
+        public static extern bool StartDocPrinter(IntPtr hPrinter, int level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFOA di);
 
         [DllImport("winspool.Drv", EntryPoint = "EndDocPrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
         public static extern bool EndDocPrinter(IntPtr hPrinter);
@@ -38,25 +34,24 @@ DOCINFOA di);
         public static extern bool EndPagePrinter(IntPtr hPrinter);
 
         [DllImport("winspool.Drv", EntryPoint = "WritePrinter", SetLastError = true, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
-        public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, ref int dwWritten);
+        public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, int dwCount, out int dwWritten);
 
         // SendBytesToPrinter()
         // When the function is given a printer name and an unmanaged array
         // of bytes, the function sends those bytes to the print queue.
         // Returns true on success, false on failure.
-        public static bool SendBytesToPrinter(string szPrinterName, IntPtr pBytes, int dwCount, string DocName = "")
+        public static bool SendBytesToPrinter(string szPrinterName, IntPtr pBytes, int dwCount)
         {
-            int dwError = 0;
-            int dwWritten = 0;
+            int dwError = 0, dwWritten = 0;
             IntPtr hPrinter = new IntPtr(0);
             DOCINFOA di = new DOCINFOA();
-            bool bSuccess = false;
-            // Assume failure unless you specifically succeed.
-            di.pDocName = string.IsNullOrEmpty(DocName) ? "My C#.NET RAW Document" : DocName;
+            bool bSuccess = false; // Assume failure unless you specifically succeed.
+
+            di.pDocName = "My C#.NET RAW Document";
             di.pDataType = "RAW";
 
             // Open the printer.
-            if (OpenPrinter(szPrinterName.Normalize(), ref hPrinter, IntPtr.Zero))
+            if (OpenPrinter(szPrinterName.Normalize(), out hPrinter, IntPtr.Zero))
             {
                 // Start a document.
                 if (StartDocPrinter(hPrinter, 1, di))
@@ -65,7 +60,7 @@ DOCINFOA di);
                     if (StartPagePrinter(hPrinter))
                     {
                         // Write your bytes.
-                        bSuccess = WritePrinter(hPrinter, pBytes, dwCount, ref dwWritten);
+                        bSuccess = WritePrinter(hPrinter, pBytes, dwCount, out dwWritten);
                         EndPagePrinter(hPrinter);
                     }
                     EndDocPrinter(hPrinter);
@@ -88,36 +83,42 @@ DOCINFOA di);
             // Create a BinaryReader on the file.
             BinaryReader br = new BinaryReader(fs);
             // Dim an array of bytes big enough to hold the file's contents.
-            byte[] bytes = new byte[fs.Length];
-            bool bSuccess = false;
-            // Your unmanaged pointer.
-            IntPtr pUnmanagedBytes = new IntPtr(0);
-            int nLength = 0;
-
-            nLength = Convert.ToInt32(fs.Length);
+            int length = Convert.ToInt32(fs.Length);
             // Read the contents of the file into the array.
-            bytes = br.ReadBytes(nLength);
-            // Allocate some unmanaged memory for those bytes.
-            pUnmanagedBytes = Marshal.AllocCoTaskMem(nLength);
-            // Copy the managed byte array into the unmanaged array.
-            Marshal.Copy(bytes, 0, pUnmanagedBytes, nLength);
-            // Send the unmanaged bytes to the printer.
-            bSuccess = SendBytesToPrinter(szPrinterName, pUnmanagedBytes, nLength);
-            // Free the unmanaged memory that you allocated earlier.
-            Marshal.FreeCoTaskMem(pUnmanagedBytes);
-            return bSuccess;
+            byte[] bytes = br.ReadBytes(length);
+            bool isSuccess = SendBytesToPrinter(szPrinterName, bytes);
+            return isSuccess;
         }
 
-        public static bool SendStringToPrinter(string printerName, string qrText, string DocName = "")
+        public static bool SendBytesToPrinter(string szPrinterName, byte[] bytes)
         {
-            IntPtr pBytes = default;
+            // Dim an array of bytes big enough to hold the file's contents.
+            int length = bytes.Length;
+            bool isSuccess = false;
+            // Your unmanaged pointer.
+            IntPtr unmanagedBytes = new IntPtr(0);
+            // Allocate some unmanaged memory for those bytes.
+            unmanagedBytes = Marshal.AllocCoTaskMem(length);
+            // Copy the managed byte array into the unmanaged array.
+            Marshal.Copy(bytes, 0, unmanagedBytes, length);
+            // Send the unmanaged bytes to the printer.
+            isSuccess = SendBytesToPrinter(szPrinterName, unmanagedBytes, length);
+            // Free the unmanaged memory that you allocated earlier.
+            Marshal.FreeCoTaskMem(unmanagedBytes);
+            return isSuccess;
+        }
+
+        public static bool SendStringToPrinter(string szPrinterName, string szString)
+        {
+            IntPtr pBytes;
+            int dwCount;
             // How many characters are in the string?
-            int dwCount = qrText.Length;
+            dwCount = szString.Length;
             // Assume that the printer is expecting ANSI text, and then convert
             // the string to ANSI text.
-            pBytes = Marshal.StringToCoTaskMemAnsi(qrText);
+            pBytes = Marshal.StringToCoTaskMemAnsi(szString);
             // Send the converted ANSI string to the printer.
-            SendBytesToPrinter(printerName, pBytes, dwCount, DocName);
+            SendBytesToPrinter(szPrinterName, pBytes, dwCount);
             Marshal.FreeCoTaskMem(pBytes);
             return true;
         }
